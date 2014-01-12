@@ -66,7 +66,7 @@
  *    Effect: if n is 1, clear from beginning of line to cursor
  *    Effect: if n is 2, clear entire line
  *
- * CUF (CUrsor Forward)
+ * CUF (Cursor Forward)
  *    Sequence: ESC [ n C
  *    Effect: moves cursor forward of n chars
  *
@@ -104,10 +104,12 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "linenoise.h"
 
 #define LINENOISE_DEFAULT_HISTORY_MAX_LEN 100
 #define LINENOISE_MAX_LINE 4096
+#define LINENOISE_MAX_COMMAND_LEN 128
 static char *unsupported_term[] = {"dumb","cons25",NULL};
 static linenoiseCompletionCallback *completionCallback = NULL;
 
@@ -612,7 +614,7 @@ static int linenoiseEdit(int fd, char *buf, size_t buflen, const char *prompt)
         /* Only autocomplete when the callback is set. It returns < 0 when
          * there was an error reading from fd. Otherwise it will return the
          * character that should be handled next. */
-        if (c == 9 && completionCallback != NULL) {
+        if (c == 9 && completionCallback != NULL) { /* Tab key */
             c = completeLine(&l);
             /* Return on errors */
             if (c < 0) return l.len;
@@ -667,24 +669,71 @@ static int linenoiseEdit(int fd, char *buf, size_t buflen, const char *prompt)
             /* Read the next two bytes representing the escape sequence. */
             if (read(fd,seq,2) == -1) break;
 
-            if (seq[0] == 91 && seq[1] == 68) {
-                /* Left arrow */
-                linenoiseEditMoveLeft(&l);
-            } else if (seq[0] == 91 && seq[1] == 67) {
-                /* Right arrow */
-                linenoiseEditMoveRight(&l);
-            } else if (seq[0] == 91 && (seq[1] == 65 || seq[1] == 66)) {
-                /* Up and Down arrows */
-                linenoiseEditHistoryNext(&l,
-                    (seq[1] == 65) ? LINENOISE_HISTORY_PREV :
-                                     LINENOISE_HISTORY_NEXT);
-            } else if (seq[0] == 91 && seq[1] > 48 && seq[1] < 55) {
-                /* extended escape, read additional two bytes. */
-                if (read(fd,seq2,2) == -1) break;
-                if (seq[1] == 51 && seq2[0] == 126) {
-                    /* Delete key. */
-                    linenoiseEditDelete(&l);
+            if (seq[0] == 91) {
+                switch(seq[1]) {
+                case 65: /* Up arrow */
+                    linenoiseEditHistoryNext(&l,LINENOISE_HISTORY_PREV);
+                    break;
+                case 66: /* Down arrow */
+                    linenoiseEditHistoryNext(&l,LINENOISE_HISTORY_NEXT);
+                    break;
+                case 67: /* Right arrow */
+                    linenoiseEditMoveRight(&l);
+                    break;
+                case 68: /* Left arrow */
+                    linenoiseEditMoveLeft(&l);
+                    break;
+                case 90: /* Shift Tab */
+                    // todo: complete line from history
+                    break;
+                default:
+                    if (seq[1] > 48 && seq[1] < 55) {
+                        /* Read the next two bytes continuing the escape sequence. */
+                        if (read(fd,seq2,2) == -1) break;
+                        
+                        if (seq[1] == 51 && seq2[0] == 126) {
+                            /* Delete key. */
+                            linenoiseEditDelete(&l);
+                        } else if (seq[1] == 49 && seq2[0] == 59) { // modifier key
+                            char seq3[1];
+                            if (read(fd,seq3,1) == -1) break;
+
+                            if (seq2[1] == 53) { // ctrl key
+                                if (seq3[0] == 67) {
+                                    while (!isspace(buf[l.pos]) && l.pos < l.len) {
+                                        l.pos++;
+                                    }
+                                    while (isspace(buf[l.pos]) && l.pos <= l.len) {
+                                        l.pos++;
+                                    }
+                                    refreshLine(&l);
+                                } else if (seq3[0] == 68) {
+                                    if (l.pos > 0) { l.pos--; }
+                                    while (isspace(buf[l.pos]) && l.pos > 0) {
+                                        l.pos--;
+                                    }
+                                    while (!isspace(buf[l.pos-1]) && l.pos > 0) {
+                                        l.pos--;
+                                    }
+                                    refreshLine(&l);
+                                }
+                            }
+                        }
+                    }
+                    break;
                 }
+            } else if (seq[0] == 79 && seq[1] == 72) {
+                 /* Home button */
+                 if (l.pos > 0) {
+                     l.pos = 0;
+                     refreshLine(&l);
+                 }
+            } else if (seq[0] == 79 && seq[1] == 70) {
+                 /* End button */
+                 if (l.pos != l.len) {
+                     l.pos = l.len;
+                     refreshLine(&l);
+                 }
             }
             break;
         default:
@@ -811,6 +860,7 @@ int linenoiseHistoryAdd(const char *line) {
         memmove(history,history+1,sizeof(char*)*(history_max_len-1));
         history_len--;
     }
+    if (history_len && !strcmp(history[history_len-1], line)) return 0;
     history[history_len] = linecopy;
     history_len++;
     return 1;
