@@ -1,7 +1,7 @@
-/* linenoise.h -- guerrilla line editing library against the idea that a
+/* clir.h -- guerrilla line editing library against the idea that a
  * line editing lib needs to be 20,000 lines of C code.
  *
- * See linenoise.c for more information.
+ * See clir.c for more information.
  *
  * ------------------------------------------------------------------------
  *
@@ -37,21 +37,21 @@
 #ifndef __LINENOISE_H
 #define __LINENOISE_H
 
-typedef struct linenoiseCompletions {
-  size_t len;
-  char **cvec;
-} linenoiseCompletions;
+typedef struct clirCompletions {
+	size_t len;
+	char **cvec;
+} clirCompletions;
 
-typedef void(linenoiseCompletionCallback)(const char *, linenoiseCompletions *);
-void linenoiseSetCompletionCallback(linenoiseCompletionCallback *);
-void linenoiseAddCompletion(linenoiseCompletions *, char *);
+typedef void(clirCompletionCallback)(const char *, clirCompletions *);
+void clirSetCompletionCallback(clirCompletionCallback *);
+void clirAddCompletion(clirCompletions *, char *);
 
-char *linenoise(const char *prompt);
-int linenoiseHistoryAdd(const char *line);
-int linenoiseHistorySetMaxLen(int len);
-int linenoiseHistorySave(char *filename);
-int linenoiseHistoryLoad(char *filename);
-void linenoiseClearScreen(void);
-void linenoiseSetMultiLine(int ml);
+char *clir(const char *prompt);
+int clirHistoryAdd(const char *line);
+int clirHistorySetMaxLen(int len);
+int clirHistorySave(char *filename);
+int clirHistoryLoad(char *filename);
+void clirClearScreen(void);
+void clirSetMultiLine(int ml);
 
 #endif /* __LINENOISE_H */
