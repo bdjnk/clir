@@ -1,7 +1,7 @@
-linenoise_example: linenoise.h linenoise.c
+clir_example: clir.h clir.c
 
-linenoise_example: linenoise.c example.c
-	$(CC) -Wall -W -Os -g -o linenoise_example linenoise.c example.c
+clir_example: clir.c example.c
+	$(CC) -Wall -W -Os -g -o example clir.c example.c
 
 clean:
-	rm -f linenoise_example
+	rm -f example
